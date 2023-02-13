@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include "io.hpp"
-#include "engine.hpp"
 
 // out of line definitions for the mutexes in SyncCerr/SyncCout
 std::mutex SyncCerr::mut;

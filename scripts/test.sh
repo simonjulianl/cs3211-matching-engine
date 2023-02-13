@@ -1,11 +1,8 @@
 #!/bin/bash
 
-
-TESTCASES=(basic-example1.in basic-example2.in basic-example3.in)
-
 make clean
 make
-for i in ${!TESTCASES[@]}; do
+for i in tests/*; do
   echo -e "\nTEST CASE ${i}"
-  ./grader ./engine < tests/${TESTCASES[i]}
+  ./grader ./engine < ${i}
 done

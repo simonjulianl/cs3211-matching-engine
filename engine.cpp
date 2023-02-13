@@ -1,11 +1,7 @@
 #include <iostream>
 #include <thread>
 
-#include "io.hpp"
 #include "engine.hpp"
-#include "order.hpp"
-
-#define DEBUG
 
 void Engine::accept(ClientConnection connection)
 {
@@ -13,9 +9,26 @@ void Engine::accept(ClientConnection connection)
 	thread.detach();
 }
 
+#ifdef DEBUG
+void Engine::order_book_stat(const char* symbol) 
+{
+
+	SyncCerr {} << std::endl;
+	SyncCerr {} << "DEBUG: " << symbol << " ORDER BOOK STATUS" << std::endl;
+	SyncCerr {} << "BUY: " << std::endl;
+	for (const auto &o: buy_order_books[symbol]) {
+		SyncCerr {} << "  " << o;
+	}
+	SyncCerr {} << "SELL: " << std::endl;
+	for (const auto &o: sell_order_books[symbol]) {
+		SyncCerr {} << "  " << o;
+	}
+	SyncCerr {} << std::endl;
+}
+#endif
+
 void Engine::buy(uint32_t id, const char* symbol, uint32_t price, uint32_t count)
 {
-	// SyncCerr {} << "BUY id: " << id << " symbol: " << symbol << " price: " << price << " count: " << count << std::endl;
 	bool order_fulfilled = false;
 	
 	auto best_order = sell_order_books[symbol].begin();
@@ -35,6 +48,7 @@ void Engine::buy(uint32_t id, const char* symbol, uint32_t price, uint32_t count
 			count = 0;
 		} else {
 			count -= best_order->count;
+			cancelable.erase(best_order->order_id);
 			last_fulfilled_order = best_order;
 		}
 
@@ -46,25 +60,23 @@ void Engine::buy(uint32_t id, const char* symbol, uint32_t price, uint32_t count
 
 	// insert the unfulfilled order to buy order book
 	if (!order_fulfilled) {
-		buy_order_books[symbol].insert(Order(price, count, id));
-		Output::OrderAdded(id, symbol, price, count, false, getCurrentTimestamp());
+		auto ts = getCurrentTimestamp();
+		buy_order_books[symbol].insert(Order(price, ts, count, id));
+		cancelable[id] = {symbol, input_buy};
+		Output::OrderAdded(id, symbol, price, count, false, ts);
 	}
 			
 	// cleanup fulfilled orders from sell order book
 	if (last_fulfilled_order != sell_order_books[symbol].end())	
-		sell_order_books[symbol].erase(sell_order_books[symbol].begin(), last_fulfilled_order);
+		sell_order_books[symbol].erase(sell_order_books[symbol].begin(), ++last_fulfilled_order);
 
-	#ifdef DEBUG
-	SyncCerr {} << "DEBUG: ORDER BOOK AFTER BUY" << std::endl;
-	for (const auto &o: buy_order_books[symbol]) {
-		SyncCerr {} << o;
-	}
-	#endif
+#ifdef DEBUG
+	order_book_stat(symbol);
+#endif
 }
 
 void Engine::sell(uint32_t id, const char* symbol, uint32_t price, uint32_t count)
 {
-	// SyncCerr {} << "SELL id: " << id << " symbol: " << symbol << " price: " << price << " count: " << count << std::endl;
 	bool order_fulfilled = false;
 	
 	auto best_order = buy_order_books[symbol].begin();
@@ -84,6 +96,7 @@ void Engine::sell(uint32_t id, const char* symbol, uint32_t price, uint32_t coun
 			count = 0;
 		} else {
 			count -= best_order->count;
+			cancelable.erase(best_order->order_id);
 			last_fulfilled_order = best_order;
 		}
 
@@ -95,26 +108,57 @@ void Engine::sell(uint32_t id, const char* symbol, uint32_t price, uint32_t coun
 
 	// insert the unfulfilled order to sell order book
 	if (!order_fulfilled) {
-		sell_order_books[symbol].insert(Order(price, count, id));
-		Output::OrderAdded(id, symbol, price, count, true, getCurrentTimestamp());
+		auto ts = getCurrentTimestamp();
+		sell_order_books[symbol].insert(Order(price, ts, count, id));
+		cancelable[id] = {symbol, input_sell};
+		Output::OrderAdded(id, symbol, price, count, true, ts);
 	}
 			
 	// cleanup fulfilled orders from buy order book
-	if (last_fulfilled_order != buy_order_books[symbol].end())	
-		buy_order_books[symbol].erase(buy_order_books[symbol].begin(), last_fulfilled_order);
+	if (last_fulfilled_order != buy_order_books[symbol].end())
+		buy_order_books[symbol].erase(buy_order_books[symbol].begin(), ++last_fulfilled_order);
 
-	#ifdef DEBUG
-	SyncCerr {} << "DEBUG: ORDER BOOK AFTER SELL" << std::endl;
-	for (const auto &o: sell_order_books[symbol]) {
-		SyncCerr {} << o;
-	}
-	#endif
+#ifdef DEBUG
+	order_book_stat(symbol);
+#endif
 }
 
-// void Engine::cancel(uint32_t id)
-// {
+void Engine::cancel(uint32_t id)
+{
+	if (cancelable.find(id) == cancelable.end()) {
+		Output::OrderDeleted(id, false, getCurrentTimestamp());
+		return;
+	}
 
-// }
+	bool accept_req = false;
+	intmax_t ts = 0;
+	auto [symbol, type] = cancelable[id];
+	if (type == input_buy) {
+		auto &order_book = buy_order_books[symbol];
+		for (auto o = order_book.begin(); o != order_book.end(); o++) {
+			if (o->order_id == id) {
+				ts = getCurrentTimestamp();
+				order_book.erase(o);
+				accept_req = true;
+				break;
+			}
+		}
+	} else {
+		auto &order_book = sell_order_books[symbol];
+		for (auto o = order_book.begin(); o != order_book.end(); o++) {
+			if (o->order_id == id) {
+				ts = getCurrentTimestamp();
+				order_book.erase(o);
+				accept_req = true;
+				break;
+			}
+		}
+	}
+#ifdef DEBUG
+	order_book_stat(symbol.c_str());
+#endif
+	Output::OrderDeleted(id, accept_req, ts);
+}
 
 void Engine::connection_thread(ClientConnection connection)
 {
@@ -133,12 +177,7 @@ void Engine::connection_thread(ClientConnection connection)
 		switch(input.type)
 		{
 			case input_cancel: {
-				SyncCerr {} << "Got cancel: ID: " << input.order_id << std::endl;
-
-				// Remember to take timestamp at the appropriate time, or compute
-				// an appropriate timestamp!
-				auto output_time = getCurrentTimestamp();
-				Output::OrderDeleted(input.order_id, true, output_time);
+				cancel(input.order_id);
 				break;
 			}
 
@@ -166,14 +205,5 @@ void Engine::connection_thread(ClientConnection connection)
 				break;
 			}
 		}
-
-		// // Additionally:
-
-		// // Remember to take timestamp at the appropriate time, or compute
-		// // an appropriate timestamp!
-		// intmax_t output_time = getCurrentTimestamp();
-
-		// // Check the parameter names in `io.hpp`.
-		// Output::OrderExecuted(123, 124, 1, 2000, 10, output_time);
 	}
 }
