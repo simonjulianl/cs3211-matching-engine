@@ -55,11 +55,12 @@ private:
 
     bool process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count);
 
-    template<typename T> void remove_order(T t, std::string, uint32_t id);
+    template<typename T> void remove_order(T &t, std::string, uint32_t id);
 };
 
 inline std::chrono::microseconds::rep getCurrentTimestamp() noexcept {
-    return 1; // in serial execution, timestamp doesn't matter as the order of printing is already serialized
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    // in serial execution, timestamp doesn't matter as the order of printing is already serialized
 }
 
 #endif
