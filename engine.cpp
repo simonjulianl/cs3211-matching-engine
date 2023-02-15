@@ -15,7 +15,8 @@ void Engine::order_book_stat(const char* symbol)
         << std::endl
         << "DEBUG: " << symbol
         << " ORDER BOOK STATUS" << std::endl;
-        << "BUY: " << std::endl;
+   
+    SyncCerr {}  << "BUY: " << std::endl;
 
     for (const auto &o: buy_order_books[symbol]) {
         SyncCerr {} << "  " << o;
@@ -38,6 +39,8 @@ bool Engine::is_matching(const uint32_t &buy_price, const uint32_t &sell_price) 
 void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
     bool is_order_fulfilled = false, is_matching_successful = false;
 
+
+    auto last_fulfilled_order = sell_order_books[symbol].end();
     auto end_orderbook = sell_order_books[symbol].end();
     auto current_order = sell_order_books[symbol].begin();
 
@@ -47,11 +50,13 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
            is_matching(price, current_order->price); current_order++) {
         is_matching_successful = true;
         is_order_fulfilled = process_matching_order(id, current_order, count);
+        if (current_order->count == 0)
+            last_fulfilled_order = current_order;
     }
 
     // cleanup fulfilled orders
     if (is_matching_successful) {
-        sell_order_books[symbol].erase(sell_order_books[symbol].begin(), current_order);
+        sell_order_books[symbol].erase(sell_order_books[symbol].begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -99,6 +104,7 @@ void Engine::insert_sell_order(const char *symbol, const Order &new_order) {
 void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
     bool is_order_fulfilled = false, is_matching_successful = false;
 
+    auto last_fulfilled_order = buy_order_books[symbol].end();
     auto end_orderbook = buy_order_books[symbol].end();
     auto current_order = buy_order_books[symbol].begin();
 
@@ -108,11 +114,13 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
            is_matching(current_order->price, price); current_order++) {
         is_matching_successful = true;
         is_order_fulfilled = process_matching_order(id, current_order, count);
+        if (current_order->count == 0)
+            last_fulfilled_order = current_order;
     }
 
     // cleanup fulfilled orders
     if (is_matching_successful) {
-        buy_order_books[symbol].erase(buy_order_books[symbol].begin(), current_order);
+        buy_order_books[symbol].erase(buy_order_books[symbol].begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -144,12 +152,13 @@ bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_orde
         return true;
     } else {
         count -= current_order->count;
+        current_order->count = 0;
         cancelable.erase(current_order->order_id);
-        return false;
+        return count == 0;
     }
 }
 
-template<typename T> void Engine::remove_order(T t, std::string symbol, uint32_t id) {
+template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_t id) {
     bool is_req_accept = false;
 
     intmax_t ts = 0;
