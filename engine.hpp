@@ -12,7 +12,9 @@
 #include "order.hpp"
 
 // #define DEBUG
-
+// TODO: need to make lightswitch for buy and sell to allow multiple buy and no sell, and vice versa (check unisex problem in the little book of semaphores)
+// TODO: need to make safe thread DS for unordered map, refer to https://www.appsloveworld.com/cplus/100/13/unordered-map-thread-safetyj
+// TODO: need to make m map from instrument to lightswitch struct (semaphore, counter, bla bla)
 typedef std::unordered_map<uint32_t, std::pair<std::string, CommandType>> CancelMap;
 typedef std::set<Order, decltype(buy_cmp)> SingleBuyOrderBook;
 typedef std::set<Order, decltype(sell_cmp)> SingleSellOrderBook;
