@@ -32,3 +32,6 @@ $(BUILDDIR): ; @mkdir -p $@
 DEPFILES := $(SRCS:%=$(BUILDDIR)/%.d) $(BUILDDIR)/client.cpp.d
 
 -include $(DEPFILES)
+
+safemap_test: safemap_test.cpp
+	$(CXX) $(CXXFLAGS) -fsanitize=thread -fPIE -pie $^
