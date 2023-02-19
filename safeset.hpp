@@ -43,7 +43,7 @@ public:
     return s.size();
   }
   
-  bool contains(const Key &item) {
+  bool contains(const Key& item) {
     std::shared_lock lock(mtx);
     bool exists = (s.find(item) != s.end());
     return exists;

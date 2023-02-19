@@ -59,16 +59,16 @@ void int_check() {
   std::cout << "OK" << std::endl;
 }
 
-void order_writer(int id, SafeMap<std::string, std::set<Order, decltype(buy_cmp)>> &m) {
+void order_writer(int id, SafeMap<std::string, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>> &m) {
   for (int i = 0; i < NUM_ITEMS; ++i) {
     std::string key = "SYMBOL" + std::to_string(id * NUM_ITEMS + i);
     if (!m.contains(key)) {
-      m.put({key, std::set<Order, decltype(buy_cmp)>()});
+      m.put({key, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>()});
     }
   }
 }
 
-void order_reader(SafeMap<std::string, std::set<Order, decltype(buy_cmp)>> &m) {
+void order_reader(SafeMap<std::string, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>> &m) {
   for (int i = 0; i < NUM_WRITERS * NUM_ITEMS; ++i) {
     std::string key = "SYMBOL" + std::to_string(i);
     std::cout << "Item " << (key) << " exists? " << (m.contains(key) ? "True " : "False ");
@@ -76,7 +76,7 @@ void order_reader(SafeMap<std::string, std::set<Order, decltype(buy_cmp)>> &m) {
 }
 
 void order_check() {
-  SafeMap<std::string, std::set<Order, decltype(buy_cmp)>> m;
+  SafeMap<std::string, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>> m;
   std::vector<std::thread> rt(NUM_READERS);
   std::vector<std::thread> wt(NUM_WRITERS);
 

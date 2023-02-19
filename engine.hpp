@@ -4,6 +4,7 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
+#include <memory>
 #include <unordered_map>
 #include <set>
 #include <string>
@@ -16,8 +17,8 @@
 // TODO: need to make safe thread DS for unordered map, refer to https://www.appsloveworld.com/cplus/100/13/unordered-map-thread-safetyj
 // TODO: need to make m map from instrument to lightswitch struct (semaphore, counter, bla bla)
 typedef std::unordered_map<uint32_t, std::pair<std::string, CommandType>> CancelMap;
-typedef std::set<Order, decltype(buy_cmp)> SingleBuyOrderBook;
-typedef std::set<Order, decltype(sell_cmp)> SingleSellOrderBook;
+typedef std::set<std::shared_ptr<Order>, decltype(buy_cmp)> SingleBuyOrderBook;
+typedef std::set<std::shared_ptr<Order>, decltype(sell_cmp)> SingleSellOrderBook;
 typedef std::unordered_map<std::string, SingleBuyOrderBook> MultipleBuyOrderBooks;
 typedef std::unordered_map<std::string, SingleSellOrderBook> MultipleSellOrderBooks;
 typedef SingleBuyOrderBook::const_iterator OrderBook_iterator; // Iterators for sell and buy are the same
@@ -45,7 +46,7 @@ private:
     /*
      * Helper functions
      */
-    void insert_buy_order(const char *symbol, const Order &new_order);
+    void insert_buy_order(const char* symbol, std::shared_ptr<Order> new_order);
 
     static bool is_matching(const uint32_t &active_buy_price, const uint32_t &resting_sell_price);
 
@@ -53,7 +54,7 @@ private:
     void order_book_stat(const char* symbol);
 #endif
 
-    void insert_sell_order(const char *symbol, const Order &new_order);
+    void insert_sell_order(const char* symbol, std::shared_ptr<Order> new_order);
 
     bool process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count);
 

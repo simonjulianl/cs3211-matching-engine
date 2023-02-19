@@ -11,13 +11,13 @@
 #define NUM_READERS 10
 #define NUM_WRITERS 10
 
-void int_writer(int id, SafeSet<int> &s) {
+void int_writer(int id, SafeSet<int>& s) {
   for (int i = 0; i < NUM_ITEMS; ++i) {
     s.insert(id * NUM_ITEMS + i);
   }
 }
 
-void int_reader(SafeSet<int> &s) {
+void int_reader(SafeSet<int>& s) {
   auto it = s.begin();
   for (; it != s.end(); it = s.next(it)) {
     std::cout << *it << std::endl;
@@ -61,14 +61,14 @@ void int_check() {
 
 }
 
-void order_writer(int id, SafeSet<Order, decltype(buy_cmp)> &s) {
+void order_writer(int id, SafeSet<std::shared_ptr<Order>, decltype(buy_cmp)>& s) {
   for (int i = 0; i < NUM_ITEMS; ++i) {
     int x = id * NUM_ITEMS + i;
-    s.insert(Order(x, x, x, x));
+    s.insert(std::make_shared<Order>(x, x, x, x));
   }
 }
 
-void order_reader(SafeSet<Order, decltype(buy_cmp)> &s) {
+void order_reader(SafeSet<std::shared_ptr<Order>, decltype(buy_cmp)>& s) {
   auto it = s.begin();
   for (; it != s.end(); it = s.next(it)) {
     std::cout << *it << std::endl;
@@ -76,7 +76,7 @@ void order_reader(SafeSet<Order, decltype(buy_cmp)> &s) {
 }
 
 void order_check() {
-  SafeSet<Order, decltype(buy_cmp)> s;
+  SafeSet<std::shared_ptr<Order>, decltype(buy_cmp)> s;
   std::vector<std::thread> rt(NUM_READERS);
   std::vector<std::thread> wt(NUM_WRITERS);
 
