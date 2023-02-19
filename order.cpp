@@ -8,7 +8,6 @@ std::ostream &operator<<(std::ostream &os, const Order &o) {
        << "  id: " << o.order_id
        << "  price: " << o.price
        << "  quantity: " << o.count
-       << "  timestamp: " << o.timestamp
-       << std::endl;
+       << "  timestamp: " << o.timestamp;
     return os;
 }
