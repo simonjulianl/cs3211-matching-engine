@@ -3,11 +3,13 @@
 
 #include <mutex>
 
-struct lightswitch {
+class LightSwitch {
+private:
     std::mutex lightswitch_mutex;
     int counter = 0;
 
-    void lightswitch_lock(std::mutex& m) {
+public:
+    void lock(std::mutex &m) {
         std::lock_guard<std::mutex> guard(lightswitch_mutex);
         counter++;
         if (counter == 1) {
@@ -15,10 +17,10 @@ struct lightswitch {
         }
     }
 
-    void lightswitch_unlock(std::mutex& m) {
+    void unlock(std::mutex &m) {
         std::lock_guard<std::mutex> guard(lightswitch_mutex);
         counter--;
-        if (counter == 1) {
+        if (counter == 0) {
             m.unlock();
         }
     }

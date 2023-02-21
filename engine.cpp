@@ -47,10 +47,10 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
     // match order
     for (; !is_order_fulfilled &&
            current_order != end_orderbook &&
-           is_matching(price, current_order->price); current_order++) {
+           is_matching(price, (*current_order)->price); current_order++) {
         is_matching_successful = true;
         is_order_fulfilled = process_matching_order(id, current_order, count);
-        if (current_order->count == 0)
+        if ((*current_order)->count == 0)
             last_fulfilled_order = current_order;
     }
 
@@ -62,7 +62,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
     // insert the unfulfilled order to buy order book
     if (!is_order_fulfilled) {
         auto ts = getCurrentTimestamp();
-        const Order &new_order = Order(price, ts, count, id);
+        std::shared_ptr<Order> new_order = std::make_shared<Order>(price, ts, count, id);
         insert_buy_order(symbol, new_order);
     }
 
@@ -71,33 +71,33 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
 #endif
 }
 
-void Engine::insert_buy_order(const char *symbol, const Order &new_order) {
+void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_order) {
     buy_order_books[symbol].insert(new_order);
-    const uint32_t id = new_order.order_id;
+    const uint32_t id = new_order->order_id;
     cancelable[id] = {symbol, input_buy};
 
     Output::OrderAdded(
             id,
             symbol,
-            new_order.price,
-            new_order.count,
+            new_order->price,
+            new_order->count,
             false,
-            new_order.timestamp
+            new_order->timestamp
     );
 }
 
-void Engine::insert_sell_order(const char *symbol, const Order &new_order) {
+void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_order) {
     sell_order_books[symbol].insert(new_order);
-    const uint32_t id = new_order.order_id;
+    const uint32_t id = new_order->order_id;
     cancelable[id] = {symbol, input_sell};
 
     Output::OrderAdded(
             id,
             symbol,
-            new_order.price,
-            new_order.count,
+            new_order->price,
+            new_order->count,
             true,
-            new_order.timestamp
+            new_order->timestamp
     );
 }
 
@@ -111,10 +111,10 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
     // match order
     for (; !is_order_fulfilled &&
            current_order != end_orderbook &&
-           is_matching(current_order->price, price); current_order++) {
+           is_matching((*current_order)->price, price); current_order++) {
         is_matching_successful = true;
         is_order_fulfilled = process_matching_order(id, current_order, count);
-        if (current_order->count == 0)
+        if ((*current_order)->count == 0)
             last_fulfilled_order = current_order;
     }
 
@@ -126,7 +126,7 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
     // insert the unfulfilled order to buy order book
     if (!is_order_fulfilled) {
         auto ts = getCurrentTimestamp();
-        const Order &new_order = Order(price, ts, count, id);
+        std::shared_ptr<Order> new_order = std::make_shared<Order>(price, ts, count, id);
         insert_sell_order(symbol, new_order);
     }
 
@@ -137,23 +137,23 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
 
 bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count) {
     Output::OrderExecuted(
-            current_order->order_id,
+            (*current_order)->order_id,
             id,
-            current_order->execution_id,
-            current_order->price,
-            std::min(current_order->count, count),
+            (*current_order)->execution_id,
+            (*current_order)->price,
+            std::min((*current_order)->count, count),
             getCurrentTimestamp()
     );
 
-    if (count < current_order->count) { // the order is fulfilled
-        current_order->count -= count;
-        (current_order->execution_id) += 1;
+    if (count < (*current_order)->count) { // the order is fulfilled
+        (*current_order)->count -= count;
+        ((*current_order)->execution_id) += 1;
         count = 0;
         return true;
     } else {
-        count -= current_order->count;
-        current_order->count = 0;
-        cancelable.erase(current_order->order_id);
+        count -= (*current_order)->count;
+        (*current_order)->count = 0;
+        cancelable.erase((*current_order)->order_id);
         return count == 0;
     }
 }
@@ -164,7 +164,7 @@ template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_
     intmax_t ts = 0;
     auto &order_book = t[symbol];
     for (auto o = order_book.begin(); o != order_book.end(); o++) {
-        if (o->order_id == id) {
+        if ((*o)->order_id == id) {
             ts = getCurrentTimestamp();
             order_book.erase(o);
             is_req_accept = true;
