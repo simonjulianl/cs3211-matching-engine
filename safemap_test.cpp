@@ -62,9 +62,7 @@ void int_check() {
 void order_writer(int id, SafeMap<std::string, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>> &m) {
   for (int i = 0; i < NUM_ITEMS; ++i) {
     std::string key = "SYMBOL" + std::to_string(id * NUM_ITEMS + i);
-    if (!m.contains(key)) {
-      m.put({key, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>()});
-    }
+    m.getOrDefault(key, std::set<std::shared_ptr<Order>, decltype(buy_cmp)>());
   }
 }
 

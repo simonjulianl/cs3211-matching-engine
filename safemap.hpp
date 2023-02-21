@@ -35,7 +35,7 @@ public:
         if (ptr == hmap.end()) {
             {
                 std::unique_lock lock(mtx);
-                hmap.insert(default_value);
+                hmap.insert({key, default_value});
                 return hmap.find(key)->second;
             }
         }
