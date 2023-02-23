@@ -9,7 +9,7 @@ void Engine::accept(ClientConnection connection) {
 }
 
 #ifdef DEBUG
-void Engine::order_book_stat(const char* symbol) 
+void Engine::order_book_stat(const char* symbol)
 {
     SyncCerr {}
         << std::endl
@@ -38,7 +38,6 @@ bool Engine::is_matching(const uint32_t &buy_price, const uint32_t &sell_price) 
 
 void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
     bool is_order_fulfilled = false, is_matching_successful = false;
-
 
     auto last_fulfilled_order = sell_order_books[symbol].end();
     auto end_orderbook = sell_order_books[symbol].end();
@@ -74,7 +73,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
 void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_order) {
     buy_order_books[symbol].insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable[id] = {symbol, input_buy};
+    cancelable.put({id, {symbol, input_buy}});
 
     Output::OrderAdded(
             id,
@@ -89,7 +88,7 @@ void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_ord
 void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_order) {
     sell_order_books[symbol].insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable[id] = {symbol, input_sell};
+    cancelable.put({id, {symbol, input_sell}});
 
     Output::OrderAdded(
             id,
@@ -179,7 +178,7 @@ template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_
 }
 
 void Engine::cancel(uint32_t id) {
-    if (cancelable.find(id) == cancelable.end()) {
+    if (!cancelable.contains(id)) {
         Output::OrderDeleted(
                 id,
                 false,
@@ -188,7 +187,8 @@ void Engine::cancel(uint32_t id) {
         return;
     }
 
-    auto [symbol, type] = cancelable[id];
+    const std::pair<std::string, CommandType> dummy_default = {"null", input_sell};
+    auto [symbol, type] = cancelable.getOrDefault(id, dummy_default);
     if (type == input_buy) {
         remove_order<MultipleBuyOrderBooks>(buy_order_books, symbol, id);
     } else {

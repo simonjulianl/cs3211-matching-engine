@@ -5,3 +5,4 @@ client
 compile_commands.json
 .cache
 .idea
+a.out
