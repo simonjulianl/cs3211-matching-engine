@@ -15,8 +15,6 @@ private:
 public:
     void put(const std::pair<Key, Val> &item) {
         std::unique_lock lock(mtx);
-        // if (hmap.find(item.first) != hmap.end())
-        //   hmap.erase(item.first);
         hmap.insert(item);
     }
 
@@ -35,8 +33,8 @@ public:
         if (ptr == hmap.end()) {
             {
                 std::unique_lock lock(mtx);
-                hmap.insert({key, default_value});
-                return hmap.find(key)->second;
+                const auto it = hmap.insert({key, default_value});
+                return it.first->second;
             }
         }
 

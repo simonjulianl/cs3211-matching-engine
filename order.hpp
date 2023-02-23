@@ -22,13 +22,13 @@ public:
 
 std::ostream &operator<<(std::ostream &os, const Order &o);
 
-auto sell_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
+const auto sell_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
     if (a->price == b->price)
         return a->timestamp < b->timestamp;
     return a->price < b->price;
 };
 
-auto buy_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
+const auto buy_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
     if (a->price == b->price)
         return a->timestamp < b->timestamp;
     return a->price > b->price;
