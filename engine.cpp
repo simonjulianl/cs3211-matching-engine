@@ -162,8 +162,6 @@ template<class T, class J> void Engine::remove_order(SafeMap<T, J> &t, std::stri
     intmax_t ts = 0;
     auto &order_book = t.getOrDefault(symbol);
     for (auto o = order_book.begin(); o != order_book.end(); order_book.next(o)) {
-        std::lock_guard<std::mutex> guard((*o)->order_mutex);
-
         if ((*o)->order_id == id) {
             ts = getCurrentTimestamp();
             order_book.erase(o);
