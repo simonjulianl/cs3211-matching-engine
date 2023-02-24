@@ -62,7 +62,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
         insert_buy_order(symbol, new_order);
     }
 
-    s.buy_lightswitch.unlock_delete<SingleSellOrderBook>(s.shared_m, order_book);
+    s.buy_lightswitch.unlock(s.shared_m);
 
 #ifdef DEBUG
     order_book_stat(symbol);
@@ -124,7 +124,7 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
         insert_sell_order(symbol, new_order);
     }
 
-    s.sell_lightswitch.unlock_delete<SingleBuyOrderBook>(s.shared_m, order_book);
+    s.sell_lightswitch.unlock(s.shared_m);
 
 #ifdef DEBUG
     order_book_stat(symbol);
