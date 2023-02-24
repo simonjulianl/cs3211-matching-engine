@@ -17,8 +17,6 @@ public:
     std::mutex order_mutex;
 
     Order(uint32_t price, intmax_t timestamp, uint32_t count, uint32_t order_id);
-
-    std::pair<bool, bool> fulfill(uint32_t &active_count);
 };
 
 std::ostream &operator<<(std::ostream &os, const Order &o);

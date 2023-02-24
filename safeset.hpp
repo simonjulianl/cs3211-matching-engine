@@ -42,7 +42,7 @@ public:
 
     typename std::set<Key, Compare>::iterator next(const it_t &it) {
         std::shared_lock lock(mtx);
-        return std::next(it);
+        return std::next(it, 1);
     }
 
     uint32_t size() {

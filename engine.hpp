@@ -13,12 +13,11 @@
 #include "order.hpp"
 #include "safemap.hpp"
 #include "safeset.hpp"
+#include "lightswitch.hpp"
 
-// #defiine DEBUG
-// TODO: need to make lightswitch for buy and sell to allow multiple buy and no sell, and vice versa (check unisex problem in the little book of semaphores)
-// TODO: need to make safe thread DS for unordered map, refer to https://www.appsloveworld.com/cplus/100/13/unordered-map-thread-safetyj
-// TODO: need to make m map from instrument to lightswitch struct (semaphore, counter, bla bla)
+// #define DEBUG
 typedef SafeMap<uint32_t, std::pair<std::string, CommandType>> CancelMap;
+typedef SafeMap<std::string, LightSwitches> MutexMap;
 typedef SafeSet<std::shared_ptr<Order>, buy_cmp> SingleBuyOrderBook;
 typedef SafeSet<std::shared_ptr<Order>, sell_cmp> SingleSellOrderBook;
 typedef SafeMap<std::string, SingleBuyOrderBook> MultipleBuyOrderBooks;
@@ -36,6 +35,9 @@ private:
 
     // maps order_id <-> {symbol, (buy/sell)}
     CancelMap cancelable;
+
+    // map symbol <-> set of mutexes
+    MutexMap mutexes;
 
     void buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count);
 
@@ -66,7 +68,6 @@ private:
 inline std::chrono::microseconds::rep getCurrentTimestamp() noexcept {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
-    // in serial execution, timestamp doesn't matter as the order of printing is already serialized
 }
 
 #endif
