@@ -3,9 +3,9 @@ import string
 
 # parameters
 filename = "large.in"
-n_symbols = 4
-n_threads = 4
-n_lines = 100
+n_symbols = 500
+n_threads = 40
+n_lines = 50000
 
 std_dev = 100
 min_price = 1000
