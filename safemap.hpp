@@ -24,7 +24,7 @@ public:
         return exists;
     }
 
-    Val &getOrDefault(const Key &key, const Val &default_value) {
+    Val &getOrDefault(const Key &key) {
         typename std::unordered_map<Key, Val>::iterator ptr;
         {
             std::shared_lock lock(mtx);
@@ -33,8 +33,7 @@ public:
         if (ptr == hmap.end()) {
             {
                 std::unique_lock lock(mtx);
-                const auto it = hmap.insert({key, default_value});
-                return it.first->second;
+                return hmap[key];
             }
         }
 

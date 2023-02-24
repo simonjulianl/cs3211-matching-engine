@@ -39,9 +39,9 @@ bool Engine::is_matching(const uint32_t &buy_price, const uint32_t &sell_price) 
 void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
     bool is_order_fulfilled = false, is_matching_successful = false;
 
-    auto last_fulfilled_order = sell_order_books[symbol].end();
-    auto end_orderbook = sell_order_books[symbol].end();
-    auto current_order = sell_order_books[symbol].begin();
+    auto last_fulfilled_order = sell_order_books.getOrDefault(symbol).end();
+    auto end_orderbook = sell_order_books.getOrDefault(symbol).end();
+    auto current_order = sell_order_books.getOrDefault(symbol).begin();
 
     // match order
     for (; !is_order_fulfilled &&
@@ -55,7 +55,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
 
     // cleanup fulfilled orders
     if (is_matching_successful) {
-        sell_order_books[symbol].erase(sell_order_books[symbol].begin(), ++last_fulfilled_order);
+        sell_order_books.getOrDefault(symbol).erase(sell_order_books.getOrDefault(symbol).begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -71,7 +71,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
 }
 
 void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_order) {
-    buy_order_books[symbol].insert(new_order);
+    buy_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
     cancelable.put({id, {symbol, input_buy}});
 
@@ -86,7 +86,7 @@ void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_ord
 }
 
 void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_order) {
-    sell_order_books[symbol].insert(new_order);
+    sell_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
     cancelable.put({id, {symbol, input_sell}});
 
@@ -103,9 +103,9 @@ void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_or
 void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
     bool is_order_fulfilled = false, is_matching_successful = false;
 
-    auto last_fulfilled_order = buy_order_books[symbol].end();
-    auto end_orderbook = buy_order_books[symbol].end();
-    auto current_order = buy_order_books[symbol].begin();
+    auto last_fulfilled_order = buy_order_books.getOrDefault(symbol).end();
+    auto end_orderbook = buy_order_books.getOrDefault(symbol).end();
+    auto current_order = buy_order_books.getOrDefault(symbol).begin();
 
     // match order
     for (; !is_order_fulfilled &&
@@ -119,7 +119,7 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
 
     // cleanup fulfilled orders
     if (is_matching_successful) {
-        buy_order_books[symbol].erase(buy_order_books[symbol].begin(), ++last_fulfilled_order);
+        buy_order_books.getOrDefault(symbol).erase(buy_order_books.getOrDefault(symbol).begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -157,11 +157,11 @@ bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_orde
     }
 }
 
-template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_t id) {
+template<class T, class J> void Engine::remove_order(SafeMap<T, J> &t, std::string symbol, uint32_t id) {
     bool is_req_accept = false;
 
     intmax_t ts = 0;
-    auto &order_book = t[symbol];
+    auto &order_book = t.getOrDefault(symbol);
     for (auto o = order_book.begin(); o != order_book.end(); o++) {
         if ((*o)->order_id == id) {
             ts = getCurrentTimestamp();
@@ -187,12 +187,11 @@ void Engine::cancel(uint32_t id) {
         return;
     }
 
-    const std::pair<std::string, CommandType> dummy_default = {"null", input_sell};
-    auto [symbol, type] = cancelable.getOrDefault(id, dummy_default);
+    auto [symbol, type] = cancelable.getOrDefault(id);
     if (type == input_buy) {
-        remove_order<MultipleBuyOrderBooks>(buy_order_books, symbol, id);
+        remove_order(buy_order_books, symbol, id);
     } else {
-        remove_order<MultipleSellOrderBooks>(sell_order_books, symbol, id);
+        remove_order(sell_order_books, symbol, id);
     }
 #ifdef DEBUG
     order_book_stat(symbol.c_str());

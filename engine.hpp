@@ -21,8 +21,8 @@
 typedef SafeMap<uint32_t, std::pair<std::string, CommandType>> CancelMap;
 typedef SafeSet<std::shared_ptr<Order>, buy_cmp> SingleBuyOrderBook;
 typedef SafeSet<std::shared_ptr<Order>, sell_cmp> SingleSellOrderBook;
-typedef std::unordered_map<std::string, SingleBuyOrderBook> MultipleBuyOrderBooks;
-typedef std::unordered_map<std::string, SingleSellOrderBook> MultipleSellOrderBooks;
+typedef SafeMap<std::string, SingleBuyOrderBook> MultipleBuyOrderBooks;
+typedef SafeMap<std::string, SingleSellOrderBook> MultipleSellOrderBooks;
 typedef std::set<std::shared_ptr<Order>, buy_cmp>::const_iterator OrderBook_iterator; // Iterators for sell and buy are the same
 
 struct Engine {
@@ -60,7 +60,7 @@ private:
 
     bool process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count);
 
-    template<typename T> void remove_order(T &t, std::string, uint32_t id);
+    template<class T, class J> void remove_order(SafeMap<T, J> &t, std::string, uint32_t id);
 };
 
 inline std::chrono::microseconds::rep getCurrentTimestamp() noexcept {
