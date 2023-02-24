@@ -15,8 +15,6 @@ private:
 public:
     void put(const std::pair<Key, Val> &item) {
         std::unique_lock lock(mtx);
-        // if (hmap.find(item.first) != hmap.end())
-        //   hmap.erase(item.first);
         hmap.insert(item);
     }
 
@@ -26,7 +24,7 @@ public:
         return exists;
     }
 
-    Val &getOrDefault(const Key &key, const Val &default_value) {
+    Val &getOrDefault(const Key &key) {
         typename std::unordered_map<Key, Val>::iterator ptr;
         {
             std::shared_lock lock(mtx);
@@ -35,8 +33,7 @@ public:
         if (ptr == hmap.end()) {
             {
                 std::unique_lock lock(mtx);
-                hmap.insert({key, default_value});
-                return hmap.find(key)->second;
+                return hmap[key];
             }
         }
 

@@ -17,21 +17,24 @@ public:
     std::mutex order_mutex;
 
     Order(uint32_t price, intmax_t timestamp, uint32_t count, uint32_t order_id);
-    std::pair<bool, bool> fulfill(uint32_t& active_count);
 };
 
 std::ostream &operator<<(std::ostream &os, const Order &o);
 
-auto sell_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
-    if (a->price == b->price)
-        return a->timestamp < b->timestamp;
-    return a->price < b->price;
+struct sell_cmp {
+    bool operator()(const std::shared_ptr<Order>& a, const std::shared_ptr<Order>& b) const {
+        if (a->price == b->price)
+            return a->timestamp < b->timestamp;
+        return a->price < b->price;
+    }
 };
 
-auto buy_cmp = [](const std::shared_ptr<Order> a, const std::shared_ptr<Order> b) {
-    if (a->price == b->price)
-        return a->timestamp < b->timestamp;
-    return a->price > b->price;
+struct buy_cmp {
+    bool operator()(const std::shared_ptr<Order>& a, const std::shared_ptr<Order>& b) const {
+        if (a->price == b->price)
+            return a->timestamp < b->timestamp;
+        return a->price > b->price;
+    }
 };
 
 #endif

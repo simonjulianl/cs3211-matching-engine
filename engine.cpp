@@ -9,7 +9,7 @@ void Engine::accept(ClientConnection connection) {
 }
 
 #ifdef DEBUG
-void Engine::order_book_stat(const char* symbol) 
+void Engine::order_book_stat(const char* symbol)
 {
     SyncCerr {}
         << std::endl
@@ -37,26 +37,22 @@ bool Engine::is_matching(const uint32_t &buy_price, const uint32_t &sell_price) 
 }
 
 void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
-    bool is_order_fulfilled = false, is_matching_successful = false;
+    bool is_order_fulfilled = false;
 
+    auto &s = mutexes.getOrDefault(symbol);
+    s.buy_lightswitch.lock(s.shared_m);
 
-    auto last_fulfilled_order = sell_order_books[symbol].end();
-    auto end_orderbook = sell_order_books[symbol].end();
-    auto current_order = sell_order_books[symbol].begin();
+    auto &order_book = sell_order_books.getOrDefault(symbol);
+    auto end_orderbook = order_book.end();
 
     // match order
-    for (; !is_order_fulfilled &&
-           current_order != end_orderbook &&
-           is_matching(price, (*current_order)->price); current_order++) {
-        is_matching_successful = true;
+    for (auto current_order = order_book.begin();
+         !is_order_fulfilled &&
+         current_order != end_orderbook &&
+         is_matching(price,
+                     (*current_order)->price);
+         current_order = order_book.next(current_order)) {
         is_order_fulfilled = process_matching_order(id, current_order, count);
-        if ((*current_order)->count == 0)
-            last_fulfilled_order = current_order;
-    }
-
-    // cleanup fulfilled orders
-    if (is_matching_successful) {
-        sell_order_books[symbol].erase(sell_order_books[symbol].begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -66,15 +62,17 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
         insert_buy_order(symbol, new_order);
     }
 
+    s.buy_lightswitch.unlock_delete<SingleSellOrderBook>(s.shared_m, order_book);
+
 #ifdef DEBUG
     order_book_stat(symbol);
 #endif
 }
 
-void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_order) {
-    buy_order_books[symbol].insert(new_order);
+void Engine::insert_buy_order(const char *symbol, std::shared_ptr<Order> new_order) {
+    buy_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable[id] = {symbol, input_buy};
+    cancelable.put({id, {symbol, input_buy}});
 
     Output::OrderAdded(
             id,
@@ -86,10 +84,10 @@ void Engine::insert_buy_order(const char* symbol, std::shared_ptr<Order> new_ord
     );
 }
 
-void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_order) {
-    sell_order_books[symbol].insert(new_order);
+void Engine::insert_sell_order(const char *symbol, std::shared_ptr<Order> new_order) {
+    sell_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable[id] = {symbol, input_sell};
+    cancelable.put({id, {symbol, input_sell}});
 
     Output::OrderAdded(
             id,
@@ -102,25 +100,21 @@ void Engine::insert_sell_order(const char* symbol, std::shared_ptr<Order> new_or
 }
 
 void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t count) {
-    bool is_order_fulfilled = false, is_matching_successful = false;
+    bool is_order_fulfilled = false;
 
-    auto last_fulfilled_order = buy_order_books[symbol].end();
-    auto end_orderbook = buy_order_books[symbol].end();
-    auto current_order = buy_order_books[symbol].begin();
+    auto &s = mutexes.getOrDefault(symbol);
+    s.sell_lightswitch.lock(s.shared_m);
+
+    auto &order_book = buy_order_books.getOrDefault(symbol);
+    auto end_orderbook = order_book.end();
 
     // match order
-    for (; !is_order_fulfilled &&
-           current_order != end_orderbook &&
-           is_matching((*current_order)->price, price); current_order++) {
-        is_matching_successful = true;
+    for (auto current_order = order_book.begin();
+         !is_order_fulfilled &&
+         current_order != end_orderbook &&
+         is_matching((*current_order)->price, price);
+         current_order = order_book.next(current_order)) {
         is_order_fulfilled = process_matching_order(id, current_order, count);
-        if ((*current_order)->count == 0)
-            last_fulfilled_order = current_order;
-    }
-
-    // cleanup fulfilled orders
-    if (is_matching_successful) {
-        buy_order_books[symbol].erase(buy_order_books[symbol].begin(), ++last_fulfilled_order);
     }
 
     // insert the unfulfilled order to buy order book
@@ -130,12 +124,16 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
         insert_sell_order(symbol, new_order);
     }
 
+    s.sell_lightswitch.unlock_delete<SingleBuyOrderBook>(s.shared_m, order_book);
+
 #ifdef DEBUG
     order_book_stat(symbol);
 #endif
 }
 
 bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count) {
+    std::lock_guard<std::mutex> lock((*current_order)->order_mutex);
+
     Output::OrderExecuted(
             (*current_order)->order_id,
             id,
@@ -158,12 +156,14 @@ bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_orde
     }
 }
 
-template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_t id) {
+template<class T, class J> void Engine::remove_order(SafeMap<T, J> &t, std::string symbol, uint32_t id) {
     bool is_req_accept = false;
 
     intmax_t ts = 0;
-    auto &order_book = t[symbol];
-    for (auto o = order_book.begin(); o != order_book.end(); o++) {
+    auto &order_book = t.getOrDefault(symbol);
+    for (auto o = order_book.begin(); o != order_book.end(); order_book.next(o)) {
+        std::lock_guard<std::mutex> guard((*o)->order_mutex);
+
         if ((*o)->order_id == id) {
             ts = getCurrentTimestamp();
             order_book.erase(o);
@@ -179,7 +179,7 @@ template<typename T> void Engine::remove_order(T &t, std::string symbol, uint32_
 }
 
 void Engine::cancel(uint32_t id) {
-    if (cancelable.find(id) == cancelable.end()) {
+    if (!cancelable.contains(id)) {
         Output::OrderDeleted(
                 id,
                 false,
@@ -188,12 +188,17 @@ void Engine::cancel(uint32_t id) {
         return;
     }
 
-    auto [symbol, type] = cancelable[id];
+    auto [symbol, type] = cancelable.getOrDefault(id);
+    auto &s = mutexes.getOrDefault(symbol);
+    s.cancel_lightswitch.lock(s.shared_m);
+
     if (type == input_buy) {
-        remove_order<MultipleBuyOrderBooks>(buy_order_books, symbol, id);
+        remove_order(buy_order_books, symbol, id);
     } else {
-        remove_order<MultipleSellOrderBooks>(sell_order_books, symbol, id);
+        remove_order(sell_order_books, symbol, id);
     }
+
+    s.cancel_lightswitch.unlock(s.shared_m);
 #ifdef DEBUG
     order_book_stat(symbol.c_str());
 #endif
