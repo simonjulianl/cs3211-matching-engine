@@ -11,6 +11,7 @@ class Order {
 public:
     uint32_t price;
     intmax_t timestamp;
+
     mutable uint32_t count;
     uint32_t order_id;
     mutable uint32_t execution_id = 1;

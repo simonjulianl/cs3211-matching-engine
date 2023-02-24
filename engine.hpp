@@ -16,7 +16,7 @@
 #include "lightswitch.hpp"
 
 // #define DEBUG
-typedef SafeMap<uint32_t, std::pair<std::string, CommandType>> CancelMap;
+typedef SafeMap<uint32_t, std::shared_ptr<Order>> CancelMap;
 typedef SafeMap<std::string, LightSwitches> MutexMap;
 typedef SafeSet<std::shared_ptr<Order>, buy_cmp> SingleBuyOrderBook;
 typedef SafeSet<std::shared_ptr<Order>, sell_cmp> SingleSellOrderBook;
@@ -61,8 +61,6 @@ private:
     void insert_sell_order(const char *symbol, std::shared_ptr<Order> new_order);
 
     bool process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count);
-
-    template<class T, class J> void remove_order(SafeMap<T, J> &t, std::string, uint32_t id);
 };
 
 inline std::chrono::microseconds::rep getCurrentTimestamp() noexcept {

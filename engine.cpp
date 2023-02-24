@@ -72,7 +72,7 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
 void Engine::insert_buy_order(const char *symbol, std::shared_ptr<Order> new_order) {
     buy_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable.put({id, {symbol, input_buy}});
+    cancelable.put({id, new_order});
 
     Output::OrderAdded(
             id,
@@ -87,7 +87,7 @@ void Engine::insert_buy_order(const char *symbol, std::shared_ptr<Order> new_ord
 void Engine::insert_sell_order(const char *symbol, std::shared_ptr<Order> new_order) {
     sell_order_books.getOrDefault(symbol).insert(new_order);
     const uint32_t id = new_order->order_id;
-    cancelable.put({id, {symbol, input_sell}});
+    cancelable.put({id, new_order});
 
     Output::OrderAdded(
             id,
@@ -134,6 +134,10 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
 bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count) {
     std::lock_guard<std::mutex> lock((*current_order)->order_mutex);
 
+    if ((*current_order)->count == 0) { // already cancelled
+        return false;
+    }
+
     Output::OrderExecuted(
             (*current_order)->order_id,
             id,
@@ -151,29 +155,8 @@ bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_orde
     } else {
         count -= (*current_order)->count;
         (*current_order)->count = 0;
-        cancelable.erase((*current_order)->order_id);
         return count == 0;
     }
-}
-
-template<class T, class J> void Engine::remove_order(SafeMap<T, J> &t, std::string symbol, uint32_t id) {
-    bool is_req_accept = false;
-
-    intmax_t ts = 0;
-    auto &order_book = t.getOrDefault(symbol);
-    for (auto o = order_book.begin(); o != order_book.end(); order_book.next(o)) {
-        if ((*o)->order_id == id) {
-            ts = getCurrentTimestamp();
-            order_book.erase(o);
-            is_req_accept = true;
-            break;
-        }
-    }
-    Output::OrderDeleted(
-            id,
-            is_req_accept,
-            ts
-    );
 }
 
 void Engine::cancel(uint32_t id) {
@@ -186,17 +169,25 @@ void Engine::cancel(uint32_t id) {
         return;
     }
 
-    auto [symbol, type] = cancelable.getOrDefault(id);
-    auto &s = mutexes.getOrDefault(symbol);
-    s.cancel_lightswitch.lock(s.shared_m);
+    auto order = cancelable.getOrDefault(id);
+    std::lock_guard<std::mutex> guard(order->order_mutex);
 
-    if (type == input_buy) {
-        remove_order(buy_order_books, symbol, id);
-    } else {
-        remove_order(sell_order_books, symbol, id);
+    if (order->count == 0) {
+        Output::OrderDeleted(
+                id,
+                false,
+                getCurrentTimestamp()
+        );
+        return;
     }
 
-    s.cancel_lightswitch.unlock(s.shared_m);
+    order->count = 0;
+    Output::OrderDeleted(
+            id,
+            true,
+            getCurrentTimestamp()
+    );
+
 #ifdef DEBUG
     order_book_stat(symbol.c_str());
 #endif

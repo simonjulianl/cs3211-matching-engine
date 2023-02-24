@@ -14,7 +14,8 @@ public:
         std::lock_guard<std::mutex> guard(lightswitch_mutex);
         counter++;
         if (counter == 1) {
-            m.lock();
+            std::lock_guard<std::mutex> l(m);
+//            m.lock();
         }
     }
 
@@ -33,19 +34,14 @@ public:
                 order_book.erase(order_book.begin(), current);
             }
 
-            m.unlock();
+            std::lock_guard<std::mutex> l(m);
+//            m.unlock();
         }
     }
 
-    void unlock(std::mutex &m) {
-        std::lock_guard<std::mutex> guard(lightswitch_mutex);
-        counter--;
-        if (counter == 0) m.unlock();
-    }
 };
 
 struct LightSwitches {
-    LightSwitch cancel_lightswitch;
     LightSwitch buy_lightswitch;
     LightSwitch sell_lightswitch;
     std::mutex shared_m;
