@@ -43,7 +43,6 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
     s.buy_lightswitch.lock(s.shared_m);
 
     auto &order_book = sell_order_books.getOrDefault(symbol);
-
     auto end_orderbook = order_book.end();
 
     // match order
@@ -53,7 +52,6 @@ void Engine::buy(uint32_t id, const char *symbol, uint32_t price, uint32_t count
          is_matching(price,
                      (*current_order)->price);
          current_order = order_book.next(current_order)) {
-        std::lock_guard<std::mutex> lock((*current_order)->order_mutex);
         is_order_fulfilled = process_matching_order(id, current_order, count);
     }
 
@@ -116,7 +114,6 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
          current_order != end_orderbook &&
          is_matching((*current_order)->price, price);
          current_order = order_book.next(current_order)) {
-        std::lock_guard<std::mutex> guard((*current_order)->order_mutex);
         is_order_fulfilled = process_matching_order(id, current_order, count);
     }
 
@@ -135,6 +132,8 @@ void Engine::sell(uint32_t id, const char *symbol, uint32_t price, uint32_t coun
 }
 
 bool Engine::process_matching_order(uint32_t id, OrderBook_iterator current_order, uint32_t &count) {
+    std::lock_guard<std::mutex> lock((*current_order)->order_mutex);
+
     Output::OrderExecuted(
             (*current_order)->order_id,
             id,
